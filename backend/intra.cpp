@@ -1,427 +1,495 @@
-#include <winsock2.h>   // must be first on Windows
 #include <iostream>
-#include <fstream>
-#include <sstream>
 #include <cstring>
 #include <cstdlib>
+#include <cctype>
 #include <climits>
-#include <string>
 using namespace std;
 
-const int MAXN = 30;  // max locations
-const int MAXE = 10;  // max edges per location
+const int MAXN = 30;
+const int MAXE = 10;
+const int NAME_LEN = 30;
 
 struct Edge {
     int to;
     int cost;
 };
 
-struct Location {
-    char name[30];
+class Location {
+public:
+    char name[NAME_LEN];
     Edge edges[MAXE];
     int edgeCount;
+
+    Location() {
+        name[0] = '\0';
+        edgeCount = 0;
+    }
 };
 
-Location graph[MAXN];
-int totalLocations = 0;
-
-string toStr(int x) {
-    ostringstream o;
-    o << x;
-    return o.str();
+bool sameText(const char a[], const char b[]) {
+    int i = 0;
+    while (a[i] != '\0' && b[i] != '\0') {
+        if (tolower((unsigned char)a[i]) != tolower((unsigned char)b[i]))
+            return false;
+        i++;
+    }
+    return a[i] == b[i];
 }
 
-/* ---------------- Graph and Dijkstra (your original logic) ---------------- */
+void trim(char s[]) {
+    int start = 0;
+    while (s[start] == ' ' || s[start] == '\t')
+        start++;
 
-int findLocation(const char name[]) {
-    for (int i = 0; i < totalLocations; i++) {
-        if (strcmp(graph[i].name, name) == 0)
-            return i;
-    }
-    return -1;
+    int len = strlen(s);
+    while (len > start && (s[len - 1] == ' ' || s[len - 1] == '\t'))
+        len--;
+
+    int k = 0;
+    for (int i = start; i < len; i++)
+        s[k++] = s[i];
+    s[k] = '\0';
 }
 
-void addLocation(const char name[]) {
-    if (totalLocations >= MAXN)
-        return;
-    strncpy(graph[totalLocations].name, name, 29);
-    graph[totalLocations].name[29] = '\0';
-    graph[totalLocations].edgeCount = 0;
-    totalLocations++;
+void readText(const char prompt[], char buffer[], int size) {
+    cout << prompt;
+    cin.getline(buffer, size);
+
+    if (cin.eof())
+        exit(0);
+
+    if (cin.fail()) {
+        cin.clear();
+        cin.ignore(10000, '\n');
+    }
+    trim(buffer);
 }
 
-void addEdge(const char u[], const char v[], int cost) {
-    int a = findLocation(u);
-    int b = findLocation(v);
-
-    if (a == -1 || b == -1)
-        return;
-    if (graph[a].edgeCount >= MAXE || graph[b].edgeCount >= MAXE)
-        return;
-
-    graph[a].edges[graph[a].edgeCount].to = b;
-    graph[a].edges[graph[a].edgeCount].cost = cost;
-    graph[a].edgeCount++;
-
-    graph[b].edges[graph[b].edgeCount].to = a;
-    graph[b].edges[graph[b].edgeCount].cost = cost;
-    graph[b].edgeCount++;
-}
-
-// Returns 0 = success, 1 = invalid location, 2 = no route
-int shortestPath(const char start[], const char destination[],
-                 int path[], int &pathSize, int &total) {
-    int source = findLocation(start);
-    int dest = findLocation(destination);
-
-    if (source == -1 || dest == -1)
-        return 1;
-
-    int distance[MAXN];
-    int previous[MAXN];
-    int visited[MAXN];
-
-    for (int i = 0; i < totalLocations; i++) {
-        distance[i] = INT_MAX;
-        previous[i] = -1;
-        visited[i] = 0;
-    }
-
-    distance[source] = 0;
-
-    for (int count = 0; count < totalLocations; count++) {
-        int current = -1;
-        int minDistance = INT_MAX;
-
-        for (int i = 0; i < totalLocations; i++) {
-            if (visited[i] == 0 && distance[i] < minDistance) {
-                minDistance = distance[i];
-                current = i;
-            }
-        }
-
-        if (current == -1)
-            break;
-
-        visited[current] = 1;
-
-        if (current == dest)
-            break;
-
-        for (int i = 0; i < graph[current].edgeCount; i++) {
-            int next = graph[current].edges[i].to;
-            int cost = graph[current].edges[i].cost;
-
-            if (visited[next] == 0 &&
-                distance[current] + cost < distance[next]) {
-                distance[next] = distance[current] + cost;
-                previous[next] = current;
-            }
-        }
-    }
-
-    if (distance[dest] == INT_MAX)
-        return 2;
-
-    int temp[MAXN];
-    int count = 0;
-    int current = dest;
-
-    while (current != -1) {
-        temp[count++] = current;
-        current = previous[current];
-    }
-
-    pathSize = 0;
-    for (int i = count - 1; i >= 0; i--)
-        path[pathSize++] = temp[i];
-
-    total = distance[dest];
-    return 0;
-}
-
-void buildCampus() {
-    addLocation("Gate1");
-    addLocation("Entry");
-    addLocation("MacLab");
-    addLocation("ERPCell");
-    addLocation("Library");
-    addLocation("GirlsWashroom1");
-    addLocation("Hall1");
-    addLocation("OfficeRoom1");
-    addLocation("Lab2");
-    addLocation("GirlsWashroom2");
-    addLocation("BoysWashroom1");
-    addLocation("Hall2");
-    addLocation("Office2");
-    addLocation("Lab1");
-    addLocation("BoysWashroom2");
-    addLocation("Out");
-    addLocation("LiftStair");
-    addLocation("Class1");
-    addLocation("Class2");
-    addLocation("Class3");
-    addLocation("Class4");
-    addLocation("Class5");
-    addLocation("SportsGround");
-    addLocation("Gate2");
-    addLocation("SeatingArea");
-    addLocation("Canteen");
-
-    addEdge("Gate1", "Entry", 3);
-    addEdge("Entry", "MacLab", 2);
-    addEdge("MacLab", "ERPCell", 3);
-    addEdge("ERPCell", "Library", 3);
-    addEdge("ERPCell", "GirlsWashroom1", 2);
-    addEdge("GirlsWashroom1", "Hall1", 4);
-    addEdge("Hall1", "OfficeRoom1", 2);
-    addEdge("OfficeRoom1", "Lab2", 4);
-    addEdge("Lab2", "GirlsWashroom2", 2);
-    addEdge("OfficeRoom1", "LiftStair", 3);
-    addEdge("Entry", "BoysWashroom1", 2);
-    addEdge("Entry", "Hall2", 3);
-    addEdge("Hall2", "Office2", 4);
-    addEdge("Office2", "Lab1", 4);
-    addEdge("Office2", "LiftStair", 3);
-    addEdge("Lab1", "BoysWashroom2", 3);
-    addEdge("BoysWashroom2", "Out", 2);
-    addEdge("Lab2", "Class1", 3);
-    addEdge("Class1", "Class2", 3);
-    addEdge("Class2", "Class3", 3);
-    addEdge("Class3", "Class4", 3);
-    addEdge("Class4", "Class5", 3);
-    addEdge("Class5", "Lab1", 3);
-    addEdge("Entry", "SportsGround", 15);
-    addEdge("SportsGround", "Gate2", 4);
-    addEdge("LiftStair", "SeatingArea", 2);
-    addEdge("LiftStair", "Canteen", 5);
-    addEdge("GirlsWashroom2", "Out", 2);
-}
-
-/* ---------------- JSON helpers ---------------- */
-
-string graphToJson() {
-    string json = "{\"locations\":[";
-    for (int i = 0; i < totalLocations; i++) {
-        if (i > 0) json += ",";
-        json += "\"" + string(graph[i].name) + "\"";
-    }
-    json += "],\"edges\":[";
-
-    bool first = true;
-    for (int i = 0; i < totalLocations; i++) {
-        for (int j = 0; j < graph[i].edgeCount; j++) {
-            int to = graph[i].edges[j].to;
-            if (to < i) continue;   // each undirected edge only once
-            if (!first) json += ",";
-            first = false;
-            json += "{\"from\":\"" + string(graph[i].name) +
-                    "\",\"to\":\"" + string(graph[to].name) +
-                    "\",\"cost\":" + toStr(graph[i].edges[j].cost) + "}";
-        }
-    }
-    json += "]}";
-    return json;
-}
-
-/* ---------------- Small web server helpers ---------------- */
-
-string urlDecode(const string &s) {
-    string out;
-    for (size_t i = 0; i < s.size(); i++) {
-        if (s[i] == '%' && i + 2 < s.size()) {
-            out += (char)strtol(s.substr(i + 1, 2).c_str(), NULL, 16);
-            i += 2;
-        } else if (s[i] == '+') {
-            out += ' ';
-        } else {
-            out += s[i];
-        }
-    }
-    return out;
-}
-
-string getParam(const string &query, const string &key) {
-    string search = key + "=";
-    size_t pos = 0;
-    while (pos < query.size()) {
-        size_t end = query.find('&', pos);
-        if (end == string::npos) end = query.size();
-        string part = query.substr(pos, end - pos);
-        if (part.compare(0, search.size(), search) == 0)
-            return urlDecode(part.substr(search.size()));
-        pos = end + 1;
-    }
-    return "";
-}
-
-bool endsWith(const string &s, const string &suffix) {
-    return s.size() >= suffix.size() &&
-           s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
-string contentTypeFor(const string &path) {
-    if (endsWith(path, ".html")) return "text/html; charset=utf-8";
-    if (endsWith(path, ".css"))  return "text/css; charset=utf-8";
-    if (endsWith(path, ".js"))   return "application/javascript; charset=utf-8";
-    if (endsWith(path, ".json")) return "application/json";
-    if (endsWith(path, ".png"))  return "image/png";
-    if (endsWith(path, ".jpg"))  return "image/jpeg";
-    if (endsWith(path, ".svg"))  return "image/svg+xml";
-    return "application/octet-stream";
-}
-
-bool readFile(const string &path, string &content) {
-    ifstream f(path.c_str(), ios::binary);
-    if (!f) return false;
-    ostringstream ss;
-    ss << f.rdbuf();
-    content = ss.str();
-    return true;
-}
-
-void sendResponse(SOCKET client, int status, const string &type, const string &body) {
-    string text = (status == 200) ? "OK" : (status == 400 ? "Bad Request" : "Not Found");
-    string head = "HTTP/1.1 " + toStr(status) + " " + text + "\r\n";
-    head += "Content-Type: " + type + "\r\n";
-    head += "Content-Length: " + toStr((int)body.size()) + "\r\n";
-    head += "Access-Control-Allow-Origin: *\r\n";
-    head += "Connection: close\r\n\r\n";
-
-    send(client, head.c_str(), (int)head.size(), 0);
-
-    size_t sent = 0;
-    while (sent < body.size()) {
-        int n = send(client, body.c_str() + sent, (int)(body.size() - sent), 0);
-        if (n <= 0) break;
-        sent += n;
-    }
-}
-
-void handleClient(SOCKET client) {
-    char buffer[4096];
-    int n = recv(client, buffer, sizeof(buffer) - 1, 0);
-    if (n <= 0) return;
-    buffer[n] = '\0';
-
-    string request(buffer);
-    size_t sp1 = request.find(' ');
-    size_t sp2 = (sp1 == string::npos) ? string::npos : request.find(' ', sp1 + 1);
-    if (sp1 == string::npos || sp2 == string::npos) {
-        sendResponse(client, 400, "application/json", "{\"error\":\"Bad request\"}");
-        return;
-    }
-
-    string target = request.substr(sp1 + 1, sp2 - sp1 - 1);
-    string path = target, query = "";
-    size_t q = target.find('?');
-    if (q != string::npos) {
-        path = target.substr(0, q);
-        query = target.substr(q + 1);
-    }
-
-    /* GET /api/graph */
-    if (path == "/api/graph") {
-        sendResponse(client, 200, "application/json", graphToJson());
-        return;
-    }
-
-    /* GET /api/route?start=Gate1&dest=Library */
-    if (path == "/api/route") {
-        string start = getParam(query, "start");
-        string dest = getParam(query, "dest");
-
-        if (start.empty() || dest.empty()) {
-            sendResponse(client, 400, "application/json", "{\"error\":\"Missing start or dest\"}");
-            return;
-        }
-
-        int route[MAXN];
-        int pathSize = 0;
-        int total = 0;
-        int status = shortestPath(start.c_str(), dest.c_str(), route, pathSize, total);
-
-        if (status == 1) {
-            sendResponse(client, 404, "application/json", "{\"error\":\"Invalid campus location!\"}");
-            return;
-        }
-        if (status == 2) {
-            sendResponse(client, 404, "application/json", "{\"error\":\"No route found!\"}");
-            return;
-        }
-
-        string json = "{\"path\":[";
-        for (int i = 0; i < pathSize; i++) {
-            if (i > 0) json += ",";
-            json += "\"" + string(graph[route[i]].name) + "\"";
-        }
-        json += "],\"totalCost\":" + toStr(total) + "}";
-        sendResponse(client, 200, "application/json", json);
-        return;
-    }
-
-    /* Everything else: serve files from ../frontend */
-    if (path == "/") path = "/index.html";
-
-    if (path.find("..") != string::npos) {
-        sendResponse(client, 404, "text/plain", "Not found");
-        return;
-    }
-
-    string content;
-    if (readFile("../frontend" + path, content)) {
-        sendResponse(client, 200, contentTypeFor(path), content);
-    } else {
-        sendResponse(client, 404, "text/plain", "Not found");
-    }
-}
-
-/* ---------------- main ---------------- */
-
-int main() {
-    buildCampus();
-
-    WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-        cout << "Could not start Winsock.\n";
-        return 1;
-    }
-
-    SOCKET server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (server == INVALID_SOCKET) {
-        cout << "Could not create socket.\n";
-        return 1;
-    }
-
-    int opt = 1;
-    setsockopt(server, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
-
-    sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addr.sin_port = htons(8080);
-
-    if (::bind(server, (sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
-        cout << "Could not use port 8080. Is another program using it?\n";
-        return 1;
-    }
-
-    listen(server, 10);
-
-    cout << "===== INTRA CAMPUS NAVIGATOR =====\n";
-    cout << "Server running. Open http://localhost:8080 in your browser.\n";
-    cout << "Press Ctrl+C to stop.\n";
+int readNumber(const char prompt[]) {
+    char line[50];
 
     while (true) {
-        SOCKET client = accept(server, NULL, NULL);
-        if (client == INVALID_SOCKET)
-            continue;
-        handleClient(client);
-        closesocket(client);
+        readText(prompt, line, 50);
+
+        char *end;
+        long value = strtol(line, &end, 10);
+
+        if (line[0] != '\0' && *end == '\0')
+            return (int)value;
+
+        cout << "  Please type a number (for example: 3).\n";
+    }
+}
+
+class CampusNavigator {
+private:
+    Location graph[MAXN];
+    int totalLocations;
+
+    int findByName(const char name[]) {
+        for (int i = 0; i < totalLocations; i++) {
+            if (sameText(graph[i].name, name))
+                return i;
+        }
+        return -1;
     }
 
-    closesocket(server);
-    WSACleanup();
+    int findLocation(const char input[]) {
+        if (input[0] == '\0')
+            return -1;
+
+        bool allDigits = true;
+        for (int i = 0; input[i] != '\0'; i++) {
+            if (!isdigit((unsigned char)input[i]))
+                allDigits = false;
+        }
+
+        if (allDigits) {
+            int number = atoi(input);
+            if (number >= 1 && number <= totalLocations)
+                return number - 1;
+        }
+
+        return findByName(input);
+    }
+
+    bool edgeExists(int a, int b) {
+        for (int i = 0; i < graph[a].edgeCount; i++) {
+            if (graph[a].edges[i].to == b)
+                return true;
+        }
+        return false;
+    }
+
+public:
+    CampusNavigator() {
+        totalLocations = 0;
+    }
+
+    void addLocation(const char name[], bool quiet = false) {
+
+        if (name[0] == '\0') {
+            cout << "A location needs a name.\n";
+            return;
+        }
+
+        if (totalLocations >= MAXN) {
+            cout << "Sorry, the campus map is full (" << MAXN
+                 << " locations maximum).\n";
+            return;
+        }
+
+        if (findByName(name) != -1) {
+            cout << "\"" << name << "\" is already on the map.\n";
+            return;
+        }
+
+        strncpy(graph[totalLocations].name, name, NAME_LEN - 1);
+        graph[totalLocations].name[NAME_LEN - 1] = '\0';
+        graph[totalLocations].edgeCount = 0;
+        totalLocations++;
+
+        if (!quiet)
+            cout << "Done! \"" << name << "\" was added as location number "
+                 << totalLocations << ".\n";
+    }
+
+    void addEdge(const char u[], const char v[], int cost, bool quiet = false) {
+
+        int a = findLocation(u);
+        int b = findLocation(v);
+
+        if (a == -1) {
+            cout << "I couldn't find \"" << u
+                 << "\". Choose option 1 to see all locations.\n";
+            return;
+        }
+        if (b == -1) {
+            cout << "I couldn't find \"" << v
+                 << "\". Choose option 1 to see all locations.\n";
+            return;
+        }
+
+        if (a == b) {
+            cout << "A place can't be connected to itself.\n";
+            return;
+        }
+
+        if (cost <= 0) {
+            cout << "The distance must be greater than zero.\n";
+            return;
+        }
+
+        if (edgeExists(a, b)) {
+            cout << graph[a].name << " and " << graph[b].name
+                 << " are already connected.\n";
+            return;
+        }
+
+        if (graph[a].edgeCount >= MAXE || graph[b].edgeCount >= MAXE) {
+            cout << "One of these places already has the maximum of "
+                 << MAXE << " connections.\n";
+            return;
+        }
+
+        graph[a].edges[graph[a].edgeCount].to = b;
+        graph[a].edges[graph[a].edgeCount].cost = cost;
+        graph[a].edgeCount++;
+
+        graph[b].edges[graph[b].edgeCount].to = a;
+        graph[b].edges[graph[b].edgeCount].cost = cost;
+        graph[b].edgeCount++;
+
+        if (!quiet)
+            cout << "Connected " << graph[a].name << " <-> " << graph[b].name
+                 << " (distance " << cost << ").\n";
+    }
+
+    void displayLocations() {
+
+        cout << "\n===== CAMPUS LOCATIONS =====\n";
+
+        if (totalLocations == 0) {
+            cout << "No locations yet. Use option 4 to add one.\n";
+            return;
+        }
+
+        for (int i = 0; i < totalLocations; i++) {
+            if (i + 1 < 10)
+                cout << " ";
+            cout << i + 1 << ". " << graph[i].name << endl;
+        }
+
+        cout << "\n(Tip: you can type a number instead of a name.)\n";
+    }
+
+    void displayConnections() {
+
+        cout << "\n===== CAMPUS CONNECTIONS =====\n";
+
+        for (int i = 0; i < totalLocations; i++) {
+
+            cout << "\n" << graph[i].name << " connects to:\n";
+
+            if (graph[i].edgeCount == 0) {
+                cout << "   (nothing yet)\n";
+                continue;
+            }
+
+            for (int j = 0; j < graph[i].edgeCount; j++) {
+                int next = graph[i].edges[j].to;
+                cout << "   - " << graph[next].name
+                     << " (distance " << graph[i].edges[j].cost << ")\n";
+            }
+        }
+    }
+
+    void searchLocation(const char name[]) {
+
+        int index = findLocation(name);
+
+        if (index == -1) {
+            cout << "Sorry, I couldn't find \"" << name << "\".\n";
+            cout << "Choose option 1 to see every location on campus.\n";
+            return;
+        }
+
+        cout << "\nFound: " << graph[index].name << endl;
+
+        if (graph[index].edgeCount == 0) {
+            cout << "It isn't connected to any other place yet.\n";
+            return;
+        }
+
+        cout << "You can walk directly to:\n";
+
+        for (int i = 0; i < graph[index].edgeCount; i++) {
+            int next = graph[index].edges[i].to;
+            cout << "   - " << graph[next].name
+                 << " (distance " << graph[index].edges[i].cost << ")\n";
+        }
+    }
+
+    void shortestPath(const char start[], const char destination[]) {
+
+        int source = findLocation(start);
+        int dest = findLocation(destination);
+
+        if (source == -1) {
+            cout << "I couldn't find the starting point \"" << start
+                 << "\". Choose option 1 to see all locations.\n";
+            return;
+        }
+        if (dest == -1) {
+            cout << "I couldn't find the destination \"" << destination
+                 << "\". Choose option 1 to see all locations.\n";
+            return;
+        }
+
+        if (source == dest) {
+            cout << "You're already at " << graph[source].name << "!\n";
+            return;
+        }
+
+        int distance[MAXN];
+        int previous[MAXN];
+        int visited[MAXN];
+
+        for (int i = 0; i < totalLocations; i++) {
+            distance[i] = INT_MAX;
+            previous[i] = -1;
+            visited[i] = 0;
+        }
+
+        distance[source] = 0;
+
+        for (int count = 0; count < totalLocations; count++) {
+
+            int current = -1;
+            int minDistance = INT_MAX;
+
+            for (int i = 0; i < totalLocations; i++) {
+                if (!visited[i] && distance[i] < minDistance) {
+                    minDistance = distance[i];
+                    current = i;
+                }
+            }
+
+            if (current == -1)
+                break;
+
+            visited[current] = 1;
+
+            if (current == dest)
+                break;
+
+            for (int i = 0; i < graph[current].edgeCount; i++) {
+
+                int next = graph[current].edges[i].to;
+                int cost = graph[current].edges[i].cost;
+
+                if (!visited[next] &&
+                    distance[current] + cost < distance[next]) {
+
+                    distance[next] = distance[current] + cost;
+                    previous[next] = current;
+                }
+            }
+        }
+
+        if (distance[dest] == INT_MAX) {
+            cout << "Sorry, there is no walking route from "
+                 << graph[source].name << " to " << graph[dest].name << ".\n";
+            return;
+        }
+
+        int path[MAXN];
+        int pathSize = 0;
+        int current = dest;
+
+        while (current != -1 && pathSize < MAXN) {
+            path[pathSize++] = current;
+            current = previous[current];
+        }
+
+        cout << "\n===== SHORTEST ROUTE =====\n";
+
+        for (int i = pathSize - 1; i >= 0; i--) {
+            cout << graph[path[i]].name;
+
+            if (i > 0)
+                cout << " -> ";
+        }
+
+        cout << "\n\nTotal distance: " << distance[dest] << " units\n";
+    }
+};
+
+void pause() {
+    char dummy[10];
+    readText("\nPress Enter to go back to the menu...", dummy, 10);
+}
+
+void loadDefaultCampus(CampusNavigator &campus) {
+
+    const char *places[] = {
+        "Gate1", "Entry", "MacLab", "ERPCell", "Library",
+        "GirlsWashroom1", "Hall1", "OfficeRoom1", "Lab2",
+        "GirlsWashroom2", "BoysWashroom1", "Hall2", "Office2",
+        "Lab1", "BoysWashroom2", "Out", "LiftStair",
+        "Class1", "Class2", "Class3", "Class4", "Class5",
+        "SportsGround", "Gate2", "SeatingArea", "Canteen"
+    };
+
+    int count = sizeof(places) / sizeof(places[0]);
+    for (int i = 0; i < count; i++)
+        campus.addLocation(places[i], true);
+
+    campus.addEdge("Gate1", "Entry", 3, true);
+    campus.addEdge("Entry", "MacLab", 2, true);
+    campus.addEdge("MacLab", "ERPCell", 3, true);
+    campus.addEdge("ERPCell", "Library", 3, true);
+    campus.addEdge("ERPCell", "GirlsWashroom1", 2, true);
+    campus.addEdge("GirlsWashroom1", "Hall1", 4, true);
+    campus.addEdge("Hall1", "OfficeRoom1", 2, true);
+    campus.addEdge("OfficeRoom1", "Lab2", 4, true);
+    campus.addEdge("Lab2", "GirlsWashroom2", 2, true);
+    campus.addEdge("OfficeRoom1", "LiftStair", 3, true);
+    campus.addEdge("Entry", "BoysWashroom1", 2, true);
+    campus.addEdge("Entry", "Hall2", 3, true);
+    campus.addEdge("Hall2", "Office2", 4, true);
+    campus.addEdge("Office2", "Lab1", 4, true);
+    campus.addEdge("Office2", "LiftStair", 3, true);
+    campus.addEdge("Lab1", "BoysWashroom2", 3, true);
+    campus.addEdge("BoysWashroom2", "Out", 2, true);
+    campus.addEdge("Lab2", "Class1", 3, true);
+    campus.addEdge("Class1", "Class2", 3, true);
+    campus.addEdge("Class2", "Class3", 3, true);
+    campus.addEdge("Class3", "Class4", 3, true);
+    campus.addEdge("Class4", "Class5", 3, true);
+    campus.addEdge("Class5", "Lab1", 3, true);
+    campus.addEdge("Entry", "SportsGround", 15, true);
+    campus.addEdge("SportsGround", "Gate2", 4, true);
+    campus.addEdge("LiftStair", "SeatingArea", 2, true);
+    campus.addEdge("LiftStair", "Canteen", 5, true);
+    campus.addEdge("GirlsWashroom2", "Out", 2, true);
+}
+
+int main() {
+
+    CampusNavigator campus;
+    loadDefaultCampus(campus);
+
+    cout << "Welcome to the Intra Campus Navigator!\n";
+    cout << "Ask me for the quickest way between any two places.\n";
+
+    int choice = 0;
+
+    do {
+        cout << "\n=================================\n";
+        cout << "     INTRA CAMPUS NAVIGATOR\n";
+        cout << "=================================\n";
+        cout << "1. See all locations\n";
+        cout << "2. See campus connections\n";
+        cout << "3. Find the shortest route\n";
+        cout << "4. Add a new location\n";
+        cout << "5. Add a new connection\n";
+        cout << "6. Search for a location\n";
+        cout << "7. Exit\n\n";
+
+        choice = readNumber("What would you like to do? (1-7): ");
+
+        char first[NAME_LEN], second[NAME_LEN];
+
+        switch (choice) {
+
+            case 1:
+                campus.displayLocations();
+                pause();
+                break;
+
+            case 2:
+                campus.displayConnections();
+                pause();
+                break;
+
+            case 3:
+                readText("Where are you now? (name or number): ", first, NAME_LEN);
+                readText("Where do you want to go? (name or number): ", second, NAME_LEN);
+                campus.shortestPath(first, second);
+                pause();
+                break;
+
+            case 4:
+                readText("Name of the new location: ", first, NAME_LEN);
+                campus.addLocation(first);
+                pause();
+                break;
+
+            case 5: {
+                readText("First location (name or number): ", first, NAME_LEN);
+                readText("Second location (name or number): ", second, NAME_LEN);
+                int cost = readNumber("Distance between them: ");
+                campus.addEdge(first, second, cost);
+                pause();
+                break;
+            }
+
+            case 6:
+                readText("Location to search for (name or number): ", first, NAME_LEN);
+                campus.searchLocation(first);
+                pause();
+                break;
+
+            case 7:
+                cout << "\nThanks for using Campus Navigator. Have a great day!\n";
+                break;
+
+            default:
+                cout << "That's not on the menu. Please pick a number from 1 to 7.\n";
+        }
+
+    } while (choice != 7);
+
     return 0;
 }
